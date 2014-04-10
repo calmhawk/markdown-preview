@@ -44,14 +44,14 @@ chrome.tabs.getSelected(null, function(tab) {
 
 $('#btn-export').click(function() {
     chrome.tabs.getSelected(null, function(tab) {
-        chrome.tabs.sendRequest(tab.id, {method: "getHtml"}, function(response) {
+        chrome.tabs.sendMessage(tab.id, {method: "getHtml"}, function(response) {
             if(response.method=="getHtml"){
                 var html = response.data;
 
                 var urlObject = window.URL || window.webkitURL || window,
                     builder = new Blob([html], {type: 'text/plain; charset=utf-8'});
 
-                var saveLink = document.createElementNS("http://www.w3.org/1999/xhtml", "a")
+                var saveLink = document.createElementNS("http://www.w3.org/1999/xhtml", "a");
                 saveLink.href = urlObject.createObjectURL(builder);
                 saveLink.download = 'export.html';
                 var event = document.createEvent('MouseEvents');
@@ -64,3 +64,24 @@ $('#btn-export').click(function() {
         });
     });
 });
+
+$('#btn-export-pdf').click(function() {
+    chrome.tabs.getSelected(null, function(tab) {
+        chrome.tabs.sendMessage(tab.id, {method: "getPdf"}, function(response) {
+            if(response.method=="getPdf"){
+                var url = response.data;
+
+                var saveLink = document.createElementNS("http://www.w3.org/1999/xhtml", "a");
+                saveLink.href = url;
+                saveLink.download = 'export.pdf';
+                var event = document.createEvent('MouseEvents');
+                event.initMouseEvent(
+                    "click", true, false, window, 0, 0, 0, 0, 0
+                    , false, false, false, false, 0, null
+                );
+                saveLink.dispatchEvent(event);
+            }
+        });
+    });
+});
+

@@ -180,12 +180,59 @@
         }
     });
 
-    chrome.extension.onRequest.addListener(function(request, sender, sendResponse) {
+    chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         if(request.method == "getHtml"){
             var html = document.all[0].outerHTML;
             html = html.replace('<head>', '<head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8">');
-            sendResponse({data: html, method: "getHtml"});
+            $("link").each(function(i,d){
+                $.ajax({
+                    async: false,
+                    url : d.href, 
+                    cache : false,
+                    success : function(data) { 
+                        style = '<style>' + data + '</style>';
+                        html = html.replace(/<link[^>]+>/, style);
+                        sendResponse({data: html, method: "getHtml"});
+                    }
+                });
+            });
         }
-    });
+        else if(request.method == "getPdf"){
+            var html = document.all[0].outerHTML;
+            html = html.replace('<head>', '<head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8">');
+            $("link").each(function(i,d){
+                $.ajax({
+                    async: false,
+                    url : d.href, 
+                    cache : false,
+                    success : function(data) { 
+                        style = '<style>' + data + '</style>';
+                        html = html.replace(/<link[^>]+>/, style);
 
+                        var xhttp = new XMLHttpRequest();
+                        var request = {
+                            method: "POST",
+                            url: "http://10.105.18.52:3000/html2pdf",
+                            data: "file=" + encodeURIComponent(html)
+                        };
+                        var method = request.method ? request.method.toUpperCase() : 'GET';
+
+                        xhttp.onload = function(){
+                            var urlObject = window.URL || window.webkitURL || window;
+                            var url = urlObject.createObjectURL(xhttp.response);
+                            
+                            sendResponse({data: url, method: "getPdf"});
+                        };
+                        xhttp.open(method, request.url, true);
+                        xhttp.responseType = 'blob';
+                        xhttp.timeout = 100000;
+                        xhttp.ontimeout = function(){ console.log("Timed out!!!"); };
+                        xhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded"); 
+                        xhttp.send(request.data);
+                    }
+                });
+            });
+        }
+        return true;
+    });
 }(document));
