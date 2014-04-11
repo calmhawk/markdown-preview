@@ -42,6 +42,18 @@ chrome.tabs.getSelected(null, function(tab) {
     });
 });
 
+function triggerSaveEvent(name, url){
+    var saveLink = document.createElementNS("http://www.w3.org/1999/xhtml", "a");
+    saveLink.download = name;
+    saveLink.href = url;
+    var event = document.createEvent('MouseEvents');
+    event.initMouseEvent(
+        "click", true, false, window, 0, 0, 0, 0, 0
+        , false, false, false, false, 0, null
+    );
+    saveLink.dispatchEvent(event);
+}
+
 $('#btn-export').click(function() {
     chrome.tabs.getSelected(null, function(tab) {
         chrome.tabs.sendMessage(tab.id, {method: "getHtml"}, function(response) {
@@ -50,36 +62,29 @@ $('#btn-export').click(function() {
 
                 var urlObject = window.URL || window.webkitURL || window,
                     builder = new Blob([html], {type: 'text/plain; charset=utf-8'});
+                var url = urlObject.createObjectURL(builder);
 
-                var saveLink = document.createElementNS("http://www.w3.org/1999/xhtml", "a");
-                saveLink.href = urlObject.createObjectURL(builder);
-                saveLink.download = 'export.html';
-                var event = document.createEvent('MouseEvents');
-                event.initMouseEvent(
-                    "click", true, false, window, 0, 0, 0, 0, 0
-                    , false, false, false, false, 0, null
-                );
-                saveLink.dispatchEvent(event);
+                triggerSaveEvent('export.html', url);
             }
         });
     });
 });
 
 $('#btn-export-pdf').click(function() {
+    // TODO layer
     chrome.tabs.getSelected(null, function(tab) {
-        chrome.tabs.sendMessage(tab.id, {method: "getPdf"}, function(response) {
+        var port = chrome.tabs.connect(tab.id, {name: "getPdf"});
+        port.postMessage({method: "getPdf"});
+        port.onMessage.addListener(function(response) {
             if(response.method=="getPdf"){
+                if(response.code === -1){
+                    // TODO error
+                    return;
+                }
                 var url = response.data;
 
-                var saveLink = document.createElementNS("http://www.w3.org/1999/xhtml", "a");
-                saveLink.href = url;
-                saveLink.download = 'export.pdf';
-                var event = document.createEvent('MouseEvents');
-                event.initMouseEvent(
-                    "click", true, false, window, 0, 0, 0, 0, 0
-                    , false, false, false, false, 0, null
-                );
-                saveLink.dispatchEvent(event);
+                triggerSaveEvent('export.pdf', url);
+                port.disconnect();
             }
         });
     });

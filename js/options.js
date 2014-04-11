@@ -30,6 +30,19 @@ $('#auto-reload').change(function() {
     }
 });
 
+// pdf-server
+storage.get('pdf_server', function(items) {
+    if(items.pdf_server) {
+        $('#pdf-server').val(items.pdf_server);
+    } else {
+        $('#pdf-server').val('http://127.0.0.1:3000/html2pdf');
+    }
+});
+
+$('#pdf-server').change(function() {
+    storage.set({'pdf_server' : $('#pdf-server').val()});
+});
+
 // theme
 function getThemes() {
     storage.get(['custom_themes', 'theme'], function(items) {

@@ -180,59 +180,69 @@
         }
     });
 
+    var pdf_server;
+    storage.get('pdf_server', function(items){
+        pdf_server = items.pdf_server;
+    });
+
+    function get_document_html(){
+        var html = document.all[0].outerHTML;
+        html = html.replace('<head>', '<head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8">');
+        var pattern = new RegExp(/<link[^>]+href="([^"]+)"[^>]*>/g);
+        var match;
+        while((match = pattern.exec(html)) !== null){
+            var link = match[0], href = match[1];
+            $.ajax({
+                async: false,
+                url : href, 
+                cache : false,
+                success : function(data) { 
+                    style = '<style>' + data + '</style>';
+                    html = html.replace(link, style);
+                }
+            });
+        }
+
+        return html;
+    }
+
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         if(request.method == "getHtml"){
-            var html = document.all[0].outerHTML;
-            html = html.replace('<head>', '<head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8">');
-            $("link").each(function(i,d){
-                $.ajax({
-                    async: false,
-                    url : d.href, 
-                    cache : false,
-                    success : function(data) { 
-                        style = '<style>' + data + '</style>';
-                        html = html.replace(/<link[^>]+>/, style);
-                        sendResponse({data: html, method: "getHtml"});
-                    }
-                });
-            });
+            html = get_document_html();
+            sendResponse({data: html, method: "getHtml"});
         }
-        else if(request.method == "getPdf"){
-            var html = document.all[0].outerHTML;
-            html = html.replace('<head>', '<head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8">');
-            $("link").each(function(i,d){
-                $.ajax({
-                    async: false,
-                    url : d.href, 
-                    cache : false,
-                    success : function(data) { 
-                        style = '<style>' + data + '</style>';
-                        html = html.replace(/<link[^>]+>/, style);
-
-                        var xhttp = new XMLHttpRequest();
-                        var request = {
-                            method: "POST",
-                            url: "http://10.105.18.52:3000/html2pdf",
-                            data: "file=" + encodeURIComponent(html)
-                        };
-                        var method = request.method ? request.method.toUpperCase() : 'GET';
-
-                        xhttp.onload = function(){
-                            var urlObject = window.URL || window.webkitURL || window;
-                            var url = urlObject.createObjectURL(xhttp.response);
-                            
-                            sendResponse({data: url, method: "getPdf"});
-                        };
-                        xhttp.open(method, request.url, true);
-                        xhttp.responseType = 'blob';
-                        xhttp.timeout = 100000;
-                        xhttp.ontimeout = function(){ console.log("Timed out!!!"); };
-                        xhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded"); 
-                        xhttp.send(request.data);
-                    }
-                });
-            });
-        }
-        return true;
     });
+
+    chrome.runtime.onConnect.addListener(function(port) {
+        port.onMessage.addListener(function(request) {
+            if(request.method == "getPdf"){
+                if(pdf_server === '')
+                    port.postMessage({data: '', method: "getPdf", code: -1});
+
+                var html = get_document_html();
+
+                var xhttp = new XMLHttpRequest();
+                var method = "POST", 
+                    post_data = "file=" + encodeURIComponent(html);
+
+                xhttp.onload = function(){
+                    var urlObject = window.URL || window.webkitURL || window;
+                    var url = urlObject.createObjectURL(xhttp.response);
+
+                    console.log('pdf');
+                    port.postMessage({data: url, method: "getPdf", code: 0});
+                };
+                xhttp.open(method, pdf_server, true);
+                xhttp.responseType = 'blob';
+                xhttp.timeout = 100000;
+                xhttp.ontimeout = function(){ console.log("Timed out!!!"); };
+                xhttp.setRequestHeader("Content-Type", "application/x-www-form-urlencoded"); 
+                xhttp.send(post_data);
+
+                // async call need return true
+                return true;
+            }
+        });
+    });
+
 }(document));
